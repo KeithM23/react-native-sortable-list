@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import PropTypes from 'prop-types';
-import {ScrollView, View, StyleSheet, Platform, RefreshControl, ViewPropTypes} from 'react-native';
+import {ScrollView, View, StyleSheet, Platform, RefreshControl, ViewPropTypes, LayoutAnimation} from 'react-native';
 import {shallowEqual, swapArrayElements} from './utils';
 import Row from './Row';
 
@@ -97,30 +97,59 @@ export default class SortableList extends Component {
     this._onUpdateLayouts();
   }
 
-  componentWillReceiveProps(nextProps) {
-    const {data, order} = this.state;
-    let {data: nextData, order: nextOrder} = nextProps;
-
-    if (data && nextData && !shallowEqual(data, nextData)) {
-      nextOrder = nextOrder || Object.keys(nextData)
-      uniqueRowKey.id++;
-      this._rowsLayouts = {};
-      nextOrder.forEach((key) => {
-        this._rowsLayouts[key] = new Promise((resolve) => {
-          this._resolveRowLayout[key] = resolve;
-        });
-      });
-      this.setState({
-        animated: false,
-        data: nextData,
-        containerLayout: null,
-        rowsLayouts: null,
-        order: nextOrder
-      });
-
-    } else if (order && nextOrder && !shallowEqual(order, nextOrder)) {
-      this.setState({order: nextOrder});
+  removeAndAdjustKey(source, deletedKey) {
+    let result = {}
+    deletedKey = parseInt(deletedKey);
+    for (key in source) {
+      key = parseInt(key);
+      if (key < deletedKey) {
+        result[key] = source[key];
+      } else if (key > deletedKey) {
+        let old = key - 1;
+        result[old] = source[old];
+      }
     }
+    return result;
+  }
+
+  componentWillReceiveProps(nextProps) {
+    let nextOrder = nextProps.order || Object.keys(nextProps.data);
+
+    let curOrder = this.state.order;
+    let nextData = nextProps.data;
+
+    if (curOrder && nextOrder && curOrder.length != nextOrder.length) {
+      if (curOrder.length > nextOrder.length) {
+        let deletedOrder = nextProps.deletedOrder;
+        this._rowsLayouts = this.removeAndAdjustKey(this._rowsLayouts, deletedOrder);
+        this._resolveRowLayout = this.removeAndAdjustKey(this._resolveRowLayout, deletedOrder);
+      } else {
+        let key = nextOrder[curOrder.length];
+
+        this.setState({
+          data: nextData,
+          order: [...nextOrder],
+          containerLayout: null,
+          rowsLayouts: null,}, () => {
+
+            this._rowsLayouts[key] = new Promise((resolve) => {
+              this._resolveRowLayout[key] = resolve;
+            });
+
+            LayoutAnimation.configureNext(LayoutAnimation.create(220,
+              LayoutAnimation.Types.easeInEaseOut,
+              LayoutAnimation.Properties.opacity
+            ));
+
+            this._onUpdateLayouts();
+
+        });
+
+      }
+    }
+    this.setState({order: [...nextOrder]});
+
+
   }
 
   componentDidUpdate(prevProps, prevState) {
