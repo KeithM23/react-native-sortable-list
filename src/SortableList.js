@@ -112,6 +112,18 @@ export default class SortableList extends Component {
     return result;
   }
 
+  getOrderedData(){
+    const { data, order } = this.state;
+
+    var orderedData = []
+    for(key in order){
+      const index = order[key]
+      orderedData.push(data[index])
+    }
+    
+    return orderedData
+  }
+
   componentWillReceiveProps(nextProps) {
     let nextOrder = nextProps.order || Object.keys(nextProps.data);
 
